@@ -8,17 +8,22 @@ multi-section markdown "newspaper."
 
 1. **Fetch** (`src/newzpaper/agent_fetch.py`) — a Claude agent with the `web_search`
    tool searches X/Twitter for the accounts and keywords in `config/sources.yaml`
-   and returns structured posts (author, url, text, timestamp, topic, region). This
-   is used instead of the X API so no paid API access is required.
-2. **Pipeline** (`src/newzpaper/pipeline.py`) — normalizes topic/region values,
-   drops near-duplicate posts about the same story, buckets articles into
-   "primary" (today + yesterday) and a small "trailing" catch-up window (up to 7
-   days back, capped at 5 items), and sorts everything so Uruguay + football/
-   basketball surface first.
+   and returns structured posts (headline, text, author, url, timestamp, topic,
+   region, source_type, status). This is used instead of the X API so no paid API
+   access is required. The agent is instructed to attribute claims to their source
+   (especially club/federation accounts, which are promotional by nature) and to
+   flag speculative posts as rumors rather than reporting them as fact.
+2. **Pipeline** (`src/newzpaper/pipeline.py`) — normalizes topic/region/source_type/
+   status values and clamps future-dated timestamps, drops near-duplicate posts
+   about the same story, buckets articles into "primary" (today + yesterday) and a
+   small "trailing" catch-up window (up to 7 days back, capped at 5 items), and
+   sorts everything so Uruguay + football/basketball surface first.
 3. **Render** (`src/newzpaper/render.py`) — builds one markdown page per
    region (`uruguay.md`, `region.md`, `global.md`), a `last-week.md` catch-up
-   digest, and an `index.md` overview linking them together. Also returns the
-   whole thing combined into a single markdown string.
+   digest, and an `index.md` overview with a distinguished lead story. Also
+   returns the whole thing combined into a single markdown string. All
+   post content is markdown-escaped and links are restricted to `http(s)://`
+   before rendering, since it comes from untrusted web search results.
 
 ## Setup
 
@@ -37,6 +42,17 @@ python run.py
 Writes `output/index.md`, `output/uruguay.md`, `output/region.md`,
 `output/global.md`, `output/last-week.md`, and prints the combined markdown to
 stdout (this is also returned by `main()` if you import `run.py` as a module).
+If the fetch step fails (missing API key, rate limit, connection error), it logs
+the failure and the run continues with an empty article set rather than crashing.
+
+## Tests
+
+```bash
+python3 -m unittest discover -s tests
+```
+
+Covers `pipeline.py`, `render.py`, and `agent_fetch.py`'s JSON extraction — all
+pure functions, no network calls or API key required.
 
 ## Adding sources
 

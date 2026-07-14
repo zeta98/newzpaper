@@ -2,42 +2,90 @@
 # Add new accounts/keywords here as you find good sources -- no code changes needed.
 # To add a brand new *platform* (not X), add a new fetcher under src/newzpaper/fetchers/
 # that returns a list[Article], and register it in run.py.
+#
+# Each account has a `handle` and a `type`:
+#   club       - a team/club's own account (promotional by nature)
+#   federation - a governing body's own account (AUF, FUBB, rugby/cycling unions, etc.)
+#   journalist - an individual reporter/insider account
+#   outlet     - an independent media outlet, newspaper, or radio station
+# `type` is passed through to the fetch agent so it can attribute claims correctly
+# and avoid laundering club/federation self-promotion as neutral reporting.
+# All handles below were checked against live X profiles -- if a handle looks wrong,
+# re-verify it rather than guessing (a wrong handle silently returns zero results for
+# that source, which is hard to notice from the output alone).
 
 twitter:
   seed_accounts:
     uruguay_football:
-      - "@AUFOficial"
-      - "@ClubNacional"
-      - "@CAPeñarol"
-      - "@Ovacion_uy"
-      - "@tenfield"
-      - "@refereeuy"
+      - handle: "@AUFOficial"
+        type: federation
+      - handle: "@Nacional"
+        type: club
+      - handle: "@OficialCAP"
+        type: club
+      - handle: "@ovacionuy"
+        type: outlet
+      - handle: "@tenfieldoficial"
+        type: outlet
+      - handle: "@ArbitrajeU"
+        type: journalist
     uruguay_basketball:
-      - "@FUBBOficial"
-      - "@LUBenlinea"
+      - handle: "@fubbuy"
+        type: federation
+      - handle: "@LUB_Uy"
+        type: federation
     uruguay_general:
-      - "@ovaciondigital"
-      - "@el_pais_uy"
-      - "@Referi_uy"
+      - handle: "@elpaisuy"
+        type: outlet
+      - handle: "@Referiuy"
+        type: outlet
+      - handle: "@Sport890"
+        type: outlet
+      - handle: "@CarveDeportiva"
+        type: outlet
+    other_sports:
+      - handle: "@TerosXV"
+        type: club
+      - handle: "@RugbyUruguay"
+        type: federation
+      - handle: "@AUFfemenino"
+        type: federation
+      - handle: "@fedciclistauy"
+        type: federation
     region:
-      - "@ESPNArgentina"
-      - "@ole"
-      - "@GloboEsporte"
-      - "@CONMEBOL"
+      - handle: "@ESPNArgentina"
+        type: outlet
+      - handle: "@DiarioOle"
+        type: outlet
+      - handle: "@geglobo"
+        type: outlet
+      - handle: "@CONMEBOL"
+        type: federation
     global:
-      - "@espn"
-      - "@FabrizioRomano"
-      - "@marca"
-      - "@NBA"
-      - "@FIFAcom"
+      - handle: "@espn"
+        type: outlet
+      - handle: "@FabrizioRomano"
+        type: journalist
+      - handle: "@marca"
+        type: outlet
+      - handle: "@NBA"
+        type: federation
+      - handle: "@FIFAcom"
+        type: federation
 
   keywords:
     - "fútbol uruguayo"
     - "selección uruguaya"
-    - "AUF"
     - "Peñarol"
-    - "Nacional de Football"
+    - "Manya"
+    - "Nacional"
+    - "Bolso Nacional"
+    - "AUF"
+    - "Copa AUF Uruguay"
     - "básquetbol uruguayo"
-    - "Liga Uruguaya de Basketball"
-    - "Copa Libertadores Uruguay"
+    - "Liga Uruguaya de Básquetbol"
+    - "Los Teros rugby"
+    - "AUF femenino"
+    - "Peñarol Libertadores"
+    - "Nacional Libertadores"
     - "Copa Sudamericana"
