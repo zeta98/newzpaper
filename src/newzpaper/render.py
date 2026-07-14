@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .models import Article
 
@@ -83,7 +83,7 @@ def _last_week_page(buckets: dict[str, list[Article]]) -> str:
 
 
 def build_pages(buckets: dict[str, list[Article]], topics_config: dict, now: datetime | None = None) -> dict[str, str]:
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     primary = buckets["primary"]
 
     return {

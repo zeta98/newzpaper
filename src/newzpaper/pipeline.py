@@ -5,19 +5,29 @@ from difflib import SequenceMatcher
 
 from .models import Article
 
-VALID_TOPICS = {"football", "basketball", "other_sports", "other"}
-VALID_REGIONS = {"uruguay", "region", "global"}
-
 DUPLICATE_SIMILARITY_THRESHOLD = 0.82
 
 
-def normalize(articles: list[Article]) -> list[Article]:
-    """Safety net in case the fetcher returns a topic/region outside the known set."""
+def normalize(articles: list[Article], topics_config: dict) -> list[Article]:
+    """Safety net in case the fetcher returns a topic/region outside the known set,
+    or a naive (no-tzinfo) published_at. Runs first in run_pipeline, before dedup's
+    sort-by-published_at -- fixing tzinfo in place here (rather than only at
+    bucket_by_time) keeps every downstream comparison/sort on a consistent
+    aware datetime.
+
+    Valid topics/regions are derived from topics_config (same source sort_articles
+    uses) rather than a hardcoded set, so adding a category/region to topics.yaml
+    doesn't get silently coerced back to "other"/"global" here.
+    """
+    valid_topics = {c["id"] for c in topics_config["categories"]}
+    valid_regions = {r["id"] for r in topics_config["regions"]}
     for a in articles:
-        if a.topic not in VALID_TOPICS:
+        if a.topic not in valid_topics:
             a.topic = "other"
-        if a.region not in VALID_REGIONS:
+        if a.region not in valid_regions:
             a.region = "global"
+        if a.published_at.tzinfo is None:
+            a.published_at = a.published_at.replace(tzinfo=timezone.utc)
     return articles
 
 
@@ -51,12 +61,13 @@ def bucket_by_time(
 
     primary, trailing = [], []
     for a in articles:
-        published_at = a.published_at
-        if published_at.tzinfo is None:
-            published_at = published_at.replace(tzinfo=timezone.utc)
-        if published_at >= primary_cutoff:
+        # Normalize in place (not just for this comparison) so later sorts/renders
+        # of the same Article don't mix naive and aware datetimes.
+        if a.published_at.tzinfo is None:
+            a.published_at = a.published_at.replace(tzinfo=timezone.utc)
+        if a.published_at >= primary_cutoff:
             primary.append(a)
-        elif published_at >= trailing_cutoff:
+        elif a.published_at >= trailing_cutoff:
             trailing.append(a)
 
     trailing.sort(key=lambda x: x.published_at, reverse=True)
@@ -79,7 +90,7 @@ def sort_articles(articles: list[Article], topics_config: dict) -> list[Article]
 
 def run_pipeline(articles: list[Article], topics_config: dict, now: datetime | None = None) -> dict[str, list[Article]]:
     tw = topics_config["time_windows"]
-    articles = normalize(articles)
+    articles = normalize(articles, topics_config)
     articles = dedup(articles)
     buckets = bucket_by_time(
         articles,

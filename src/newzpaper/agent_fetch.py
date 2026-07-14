@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from datetime import datetime, timedelta, timezone
 
 from anthropic import Anthropic
@@ -74,11 +73,26 @@ Return results as the JSON array described in your instructions.
 
 
 def _extract_json_array(text: str) -> list[dict]:
-    text = text.strip()
-    match = re.search(r"\[.*\]", text, re.DOTALL)
-    if not match:
-        return []
-    return json.loads(match.group(0))
+    """Find and parse a JSON array in `text`, tolerating markdown fences and any
+    prose the model adds despite being told not to. A greedy `\\[.*\\]` regex
+    breaks as soon as trailing text contains its own brackets (e.g. "Nota: no
+    encontre nada para [@handle]"), since it always matches to the *last* `]` in
+    the string. Instead, try decoding a real JSON value starting at each `[` in
+    turn and keep the first one that parses as a list -- this is immune to
+    unrelated brackets before or after the actual array.
+    """
+    decoder = json.JSONDecoder()
+    start = text.find("[")
+    while start != -1:
+        try:
+            value, _ = decoder.raw_decode(text, start)
+        except (json.JSONDecodeError, ValueError):
+            start = text.find("[", start + 1)
+            continue
+        if isinstance(value, list):
+            return value
+        start = text.find("[", start + 1)
+    return []
 
 
 def fetch_twitter(
@@ -94,13 +108,34 @@ def fetch_twitter(
     window_start = now - timedelta(days=trailing_days)
 
     client = Anthropic()
+    user_prompt = _build_user_prompt(sources, window_start, now)
+    tools = [{"type": "web_search_20250305", "name": "web_search", "max_uses": max_web_searches}]
+
     response = client.messages.create(
         model=DEFAULT_MODEL,
         max_tokens=8000,
         system=SYSTEM_PROMPT,
-        tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": max_web_searches}],
-        messages=[{"role": "user", "content": _build_user_prompt(sources, window_start, now)}],
+        tools=tools,
+        messages=[{"role": "user", "content": user_prompt}],
     )
+
+    # The web_search server-side loop auto-pauses (stop_reason "pause_turn")
+    # after 10 tool iterations. max_web_searches defaults to 15, so this is
+    # routinely hit -- resend the turn so the agent can finish, instead of
+    # silently working from a truncated/empty response.
+    continuations = 0
+    while response.stop_reason == "pause_turn" and continuations < 4:
+        response = client.messages.create(
+            model=DEFAULT_MODEL,
+            max_tokens=8000,
+            system=SYSTEM_PROMPT,
+            tools=tools,
+            messages=[
+                {"role": "user", "content": user_prompt},
+                {"role": "assistant", "content": response.content},
+            ],
+        )
+        continuations += 1
 
     text_parts = [block.text for block in response.content if getattr(block, "type", None) == "text"]
     raw_items = _extract_json_array("\n".join(text_parts))
