@@ -1,0 +1,43 @@
+# Seed accounts and keywords for the X/Twitter agent fetcher.
+# Add new accounts/keywords here as you find good sources -- no code changes needed.
+# To add a brand new *platform* (not X), add a new fetcher under src/newzpaper/fetchers/
+# that returns a list[Article], and register it in run.py.
+
+twitter:
+  seed_accounts:
+    uruguay_football:
+      - "@AUFOficial"
+      - "@ClubNacional"
+      - "@CAPeñarol"
+      - "@Ovacion_uy"
+      - "@tenfield"
+      - "@refereeuy"
+    uruguay_basketball:
+      - "@FUBBOficial"
+      - "@LUBenlinea"
+    uruguay_general:
+      - "@ovaciondigital"
+      - "@el_pais_uy"
+      - "@Referi_uy"
+    region:
+      - "@ESPNArgentina"
+      - "@ole"
+      - "@GloboEsporte"
+      - "@CONMEBOL"
+    global:
+      - "@espn"
+      - "@FabrizioRomano"
+      - "@marca"
+      - "@NBA"
+      - "@FIFAcom"
+
+  keywords:
+    - "fútbol uruguayo"
+    - "selección uruguaya"
+    - "AUF"
+    - "Peñarol"
+    - "Nacional de Football"
+    - "básquetbol uruguayo"
+    - "Liga Uruguaya de Basketball"
+    - "Copa Libertadores Uruguay"
+    - "Copa Sudamericana"
