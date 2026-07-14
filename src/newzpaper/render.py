@@ -30,7 +30,8 @@ def _section_for_topic(articles: list[Article], topic_id: str, topics_config: di
     return "\n".join(lines)
 
 
-def _region_page(articles: list[Article], region_id: str, topics_config: dict, title: str) -> str:
+def _region_page(articles: list[Article], region_id: str, topics_config: dict) -> str:
+    title = _label(topics_config["regions"], region_id)
     region_articles = [a for a in articles if a.region == region_id]
     lines = [f"# {title}", ""]
     if not region_articles:
@@ -88,9 +89,9 @@ def build_pages(buckets: dict[str, list[Article]], topics_config: dict, now: dat
 
     return {
         "index.md": _index_page(buckets, topics_config, now),
-        "uruguay.md": _region_page(primary, "uruguay", topics_config, "Uruguay"),
-        "region.md": _region_page(primary, "region", topics_config, "Región (Sudamérica)"),
-        "global.md": _region_page(primary, "global", topics_config, "Global"),
+        "uruguay.md": _region_page(primary, "uruguay", topics_config),
+        "region.md": _region_page(primary, "region", topics_config),
+        "global.md": _region_page(primary, "global", topics_config),
         "last-week.md": _last_week_page(buckets),
     }
 

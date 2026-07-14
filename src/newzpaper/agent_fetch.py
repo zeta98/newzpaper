@@ -73,26 +73,36 @@ Return results as the JSON array described in your instructions.
 
 
 def _extract_json_array(text: str) -> list[dict]:
-    """Find and parse a JSON array in `text`, tolerating markdown fences and any
-    prose the model adds despite being told not to. A greedy `\\[.*\\]` regex
-    breaks as soon as trailing text contains its own brackets (e.g. "Nota: no
-    encontre nada para [@handle]"), since it always matches to the *last* `]` in
-    the string. Instead, try decoding a real JSON value starting at each `[` in
-    turn and keep the first one that parses as a list -- this is immune to
-    unrelated brackets before or after the actual array.
+    """Find and parse every top-level JSON array in `text`, concatenating their
+    elements. Tolerates markdown fences and any prose the model adds despite
+    being told not to.
+
+    A greedy `\\[.*\\]` regex breaks as soon as trailing text contains its own
+    brackets (e.g. "Nota: no encontre nada para [@handle]"), since it always
+    matches to the *last* `]` in the string. Stopping at the *first*
+    successfully-parsed array is also wrong: an incidental "[]" or similar in
+    leading prose (e.g. "Grupos sin novedades: [].") would short-circuit before
+    the real array. So instead: scan every `[` in the text, real-parse a JSON
+    value from each, and collect elements from every array found. On a
+    successful parse, resume scanning *after* it (not one character later) so a
+    literal "[" inside a string value (e.g. a score like "[3-2]") is never
+    mistaken for a new top-level array. Any non-conforming items this sweeps up
+    from a stray/incidental array simply fail their per-item validation in
+    fetch_twitter and get dropped there, so collecting broadly here is safe.
     """
     decoder = json.JSONDecoder()
-    start = text.find("[")
-    while start != -1:
+    items: list[dict] = []
+    pos = text.find("[")
+    while pos != -1:
         try:
-            value, _ = decoder.raw_decode(text, start)
+            value, end = decoder.raw_decode(text, pos)
         except (json.JSONDecodeError, ValueError):
-            start = text.find("[", start + 1)
+            pos = text.find("[", pos + 1)
             continue
         if isinstance(value, list):
-            return value
-        start = text.find("[", start + 1)
-    return []
+            items.extend(value)
+        pos = text.find("[", end)
+    return items
 
 
 def fetch_twitter(
