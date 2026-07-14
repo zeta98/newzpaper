@@ -12,6 +12,12 @@ PAGE_ORDER = ["index", "uruguay", "region", "global", "last-week"]
 # formatting or inject new markdown structure (e.g. a fake link) into the page.
 _MD_ESCAPE_RE = re.compile(r"([\\`*_\[\]])")
 
+# Characters that could let a URL close a `(...)` link destination early (or open
+# a new markdown/HTML construct right after) if interpolated unescaped into
+# `[author](url)`. A real X/Twitter post URL never legitimately contains any of
+# these, so reject rather than try to escape/percent-encode them.
+_UNSAFE_URL_CHARS_RE = re.compile(r"[()\[\]<>\"'\s]")
+
 _SOURCE_TYPE_NOTE = {
     "club": "fuente: el club",
     "federation": "fuente: la federación",
@@ -23,13 +29,17 @@ def _escape_md(text: str) -> str:
 
 
 def _safe_url(url: str) -> str | None:
-    """Only http(s) URLs are rendered as clickable links; anything else (a
-    javascript: scheme, a malformed value) is untrusted web-search output and is
-    dropped rather than linked.
+    """Only http(s) URLs with no markdown-breaking characters are rendered as
+    clickable links; anything else (a javascript: scheme, a malformed value, or a
+    URL containing a stray `)`/`]`/etc. that could close the `(...)` link syntax
+    early and let trailing content open a second, attacker-controlled link) is
+    untrusted web-search output and is dropped rather than linked.
     """
-    if url and (url.startswith("http://") or url.startswith("https://")):
-        return url
-    return None
+    if not url or not (url.startswith("http://") or url.startswith("https://")):
+        return None
+    if _UNSAFE_URL_CHARS_RE.search(url):
+        return None
+    return url
 
 
 def _label(items: list[dict], item_id: str) -> str:

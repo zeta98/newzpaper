@@ -79,9 +79,12 @@ Everything downstream of fetch operates on the `Article` dataclass
 2. **Pipeline** (`src/newzpaper/pipeline.py`) — pure functions, no I/O.
    `run_pipeline()` runs `normalize()` (fixes tz-naive `published_at` **in
    place**, coerces unknown topic/region/source_type/status values to their
-   fallback, and clamps any future-dated `published_at` to `now` so a
-   hallucinated/misparsed timestamp can't sort above genuinely-current
-   articles) before `dedup()`, because `dedup()` sorts by `published_at` and a
+   fallback, and *drops* any `published_at` more than `FUTURE_DATE_TOLERANCE`
+   (1 hour) ahead of `now` — clamping to `now` instead of dropping was tried
+   and rejected, since it ties a hallucinated timestamp for "most recent
+   possible" and lets it systematically outrank genuine same-day articles,
+   which often carry earlier, date-only timestamps) before `dedup()`, because
+   `dedup()` sorts by `published_at` and a
    naive/aware datetime mix raises `TypeError` — don't reorder these.
    `dedup()` uses `SequenceMatcher` text similarity (O(n²), fine at this
    project's scale) to drop near-duplicate posts about the same story.

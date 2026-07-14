@@ -64,11 +64,22 @@ class NormalizeTests(unittest.TestCase):
         normalize([a], TOPICS_CONFIG, now=NOW)
         self.assertIsNotNone(a.published_at.tzinfo)
 
-    def test_clamps_future_dated_article_to_now(self):
+    def test_drops_far_future_dated_article(self):
+        # A hallucinated/misparsed far-future timestamp must be dropped, not
+        # clamped to `now` -- clamping would tie it for "most recent possible" in
+        # sort_articles and let it outrank genuine same-day articles.
         future = NOW + timedelta(days=30)
         a = make_article(published_at=future)
-        normalize([a], TOPICS_CONFIG, now=NOW)
-        self.assertEqual(a.published_at, NOW)
+        kept = normalize([a], TOPICS_CONFIG, now=NOW)
+        self.assertEqual(kept, [])
+
+    def test_keeps_article_within_future_tolerance(self):
+        # Small clock/timezone estimation slop shouldn't drop a genuine article.
+        near_future = NOW + timedelta(minutes=15)
+        a = make_article(published_at=near_future)
+        kept = normalize([a], TOPICS_CONFIG, now=NOW)
+        self.assertEqual(kept, [a])
+        self.assertEqual(a.published_at, near_future)
 
     def test_leaves_valid_past_dates_untouched(self):
         past = NOW - timedelta(hours=3)

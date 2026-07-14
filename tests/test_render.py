@@ -69,6 +69,16 @@ class SafeUrlTests(unittest.TestCase):
     def test_rejects_empty(self):
         self.assertIsNone(_safe_url(""))
 
+    def test_rejects_url_with_closing_paren_that_could_end_link_early(self):
+        # A URL like this, interpolated unescaped into [author](url), would close
+        # the legitimate link early and let the trailing "[click](evil)" open a
+        # second, attacker-controlled link right next to it.
+        self.assertIsNone(_safe_url("https://x.com/a) [click](https://evil.com"))
+
+    def test_rejects_url_with_brackets_or_whitespace(self):
+        self.assertIsNone(_safe_url("https://x.com/a]b"))
+        self.assertIsNone(_safe_url("https://x.com/a b"))
+
 
 class RenderInjectionTests(unittest.TestCase):
     def test_malicious_text_cannot_break_out_of_link_or_bold_syntax(self):
@@ -87,6 +97,13 @@ class RenderInjectionTests(unittest.TestCase):
         pages = build_pages({"primary": [a], "trailing": []}, TOPICS_CONFIG, now=NOW)
         combined = combine_markdown(pages)
         self.assertNotIn("(javascript:alert(1))", combined)
+
+    def test_malicious_url_cannot_inject_a_second_link(self):
+        a = make_article(url="https://x.com/a) [click](https://evil.com")
+        pages = build_pages({"primary": [a], "trailing": []}, TOPICS_CONFIG, now=NOW)
+        combined = combine_markdown(pages)
+        self.assertNotIn("[click](https://evil.com)", combined)
+        self.assertNotIn("(https://evil.com)", combined)
 
 
 class BuildPagesTests(unittest.TestCase):

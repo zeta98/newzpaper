@@ -1,21 +1,32 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 
 from .models import VALID_SOURCE_TYPES, VALID_STATUSES, Article
 
+logger = logging.getLogger(__name__)
+
 DUPLICATE_SIMILARITY_THRESHOLD = 0.82
+
+# How far ahead of `now` a published_at is tolerated before being treated as
+# hallucinated/misparsed rather than ordinary clock/timezone-estimation slop.
+FUTURE_DATE_TOLERANCE = timedelta(hours=1)
 
 
 def normalize(articles: list[Article], topics_config: dict, now: datetime | None = None) -> list[Article]:
     """Safety net in case the fetcher returns a topic/region/source_type/status
-    outside the known set, a naive (no-tzinfo) published_at, or a future-dated
-    published_at (a hallucinated or misparsed timestamp would otherwise sort above
-    genuinely-current articles, since sort_articles ranks by recency). Runs first in
-    run_pipeline, before dedup's sort-by-published_at -- fixing tzinfo/future dates
-    in place here (rather than only at bucket_by_time) keeps every downstream
-    comparison/sort on a consistent, sane aware datetime.
+    outside the known set, a naive (no-tzinfo) published_at, or a published_at more
+    than FUTURE_DATE_TOLERANCE ahead of `now`. The latter are dropped rather than
+    clamped to `now`: clamping would tie a hallucinated timestamp for "most recent
+    possible" in priority_key's `-timestamp()` term, letting it systematically
+    outrank -- and potentially become the index lead story over -- genuine
+    same-day articles (many of which carry earlier, date-only timestamps since the
+    fetcher is told to use "the date at minimum" when an exact time isn't shown).
+    Runs first in run_pipeline, before dedup's sort-by-published_at -- fixing
+    tzinfo in place here (rather than only at bucket_by_time) keeps every
+    downstream comparison/sort on a consistent, sane aware datetime.
 
     Valid topics/regions are derived from topics_config (same source sort_articles
     uses) rather than a hardcoded set, so adding a category/region to topics.yaml
@@ -26,6 +37,8 @@ def normalize(articles: list[Article], topics_config: dict, now: datetime | None
     now = now or datetime.now(timezone.utc)
     valid_topics = {c["id"] for c in topics_config["categories"]}
     valid_regions = {r["id"] for r in topics_config["regions"]}
+    future_cutoff = now + FUTURE_DATE_TOLERANCE
+    kept: list[Article] = []
     for a in articles:
         if a.topic not in valid_topics:
             a.topic = "other"
@@ -37,9 +50,16 @@ def normalize(articles: list[Article], topics_config: dict, now: datetime | None
             a.status = "confirmed"
         if a.published_at.tzinfo is None:
             a.published_at = a.published_at.replace(tzinfo=timezone.utc)
-        if a.published_at > now:
-            a.published_at = now
-    return articles
+        if a.published_at > future_cutoff:
+            logger.debug(
+                "normalize: dropping future-dated article %s (published_at=%s, now=%s)",
+                a.url,
+                a.published_at,
+                now,
+            )
+            continue
+        kept.append(a)
+    return kept
 
 
 def dedup(articles: list[Article]) -> list[Article]:
