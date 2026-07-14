@@ -1,0 +1,34 @@
+# Category and region weighting. Lower `priority` / higher `weight` = shown first / bigger section.
+# Add a category by adding an entry here -- render.py builds pages from this list, no code changes needed.
+
+categories:
+  - id: football
+    label: "Fútbol"
+    priority: 1
+  - id: basketball
+    label: "Básquetbol"
+    priority: 2
+  - id: other_sports
+    label: "Otros deportes"
+    priority: 3
+  - id: other
+    label: "Otras noticias"
+    priority: 4
+
+regions:
+  - id: uruguay
+    label: "Uruguay"
+    weight: 3
+  - id: region
+    label: "Región (Sudamérica)"
+    weight: 2
+  - id: global
+    label: "Global"
+    weight: 1
+
+time_windows:
+  # "today" and "yesterday" get full coverage.
+  primary_days: 2
+  # a small "don't miss" tail pulling from up to trailing_days ago, capped at trailing_max_items.
+  trailing_days: 7
+  trailing_max_items: 5
